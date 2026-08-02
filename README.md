@@ -52,7 +52,8 @@ const result = await signRequest({
 
 ## Cross-language parity
 
-Both implementations produce byte-for-byte identical `Signature`, `Signature-Input`, and `Content-Digest` headers from the same Ed25519 seed and covered-component inputs, verified against the RFC 8032 §7.1 test vector 1 keypair.
+Both implementations produce byte-for-byte identical `Signature`, `Signature-Input`, and `Content-Digest` headers from the same Ed25519 seed and covered-component inputs. Cross-language parity is pinned with a fixed deterministic test keypair; the underlying Ed25519 is separately anchored by a genuine RFC 8032 §7.1 Test 1 known-answer test (the published public key and the published signature over the empty message) in both the Python and TypeScript suites.
+
 ## Verify your output
 
 Use [`algovoi-rfc9421-verifier`](https://github.com/chopmob-cloud/algovoi-rfc9421-verifier)
@@ -60,7 +61,6 @@ to verify locally, or POST to the hosted endpoint at
 [`verify.algovoi.co.uk/rfc9421`](https://verify.algovoi.co.uk/rfc9421)
 without any installation — pass the three output headers (`Signature-Input`,
 `Signature`, `Content-Digest`) and get back a full verification result.
-
 
 ## Covered components (default)
 

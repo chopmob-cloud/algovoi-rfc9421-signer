@@ -7,4 +7,4 @@ from algovoi_rfc9421_signer.sign import (
 )
 
 __all__ = ["sign_request", "SignResult", "SignError", "DEFAULT_COVERED"]
-__version__ = "0.1.0"
+__version__ = "0.1.1"

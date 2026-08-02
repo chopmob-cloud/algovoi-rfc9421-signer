@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "algovoi-rfc9421-signer"
-version = "0.1.0"
+version = "0.1.1"
 description = "AlgoVoi RFC 9421 HTTP Message Signatures + RFC 9530 Content-Digest signer (Ed25519)"
 readme = "README.md"
 license = { text = "Apache-2.0" }

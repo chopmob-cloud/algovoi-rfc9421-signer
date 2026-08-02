@@ -1,9 +1,11 @@
 """
 Tests for algovoi_rfc9421_signer.
 
-Uses the RFC 8032 §7.1 test vector 1 Ed25519 keypair for byte-reproducibility:
+Uses a fixed deterministic Ed25519 test keypair for byte-reproducibility. This
+is NOT the RFC 8032 Section 7.1 Test 1 seed (that seed ends ...cae7f60); this
+seed ends ...cae3d55 and derives the public key shown below.
   seed (private):  9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae3d55
-  public key:      d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a
+  public key:      700e2ce7c4b674427eab27ba820bcf6f0faebe68e09fe8564292114e41dc6a41
 
 All tests use fixed `created=1748000000` so signing-base + signature are
 deterministic and can be cross-validated against the TypeScript package,
@@ -16,7 +18,7 @@ import pytest
 
 from algovoi_rfc9421_signer import sign_request, SignError, DEFAULT_COVERED
 
-# RFC 8032 §7.1 test vector 1
+# Fixed deterministic Ed25519 test keypair (NOT RFC 8032 Test 1; seed ends ...cae3d55)
 SEED_HEX = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae3d55"
 SEED = bytes.fromhex(SEED_HEX)
 KEYID = "did:web:api.algovoi.co.uk"
@@ -403,3 +405,77 @@ class TestAnchorVector:
             created=CREATED,
         )
         assert r.signing_base == expected_base
+
+
+# ---------------------------------------------------------------------------
+# RFC 8032 Section 7.1 Test 1 — genuine known-answer test
+# ---------------------------------------------------------------------------
+
+# Authoritative values published in RFC 8032 §7.1 (TEST 1). These anchor the
+# signer's Ed25519 implementation against the RFC itself — distinct from the
+# local deterministic parity fixture above (seed ...cae3d55 / pubkey 700e2ce7...),
+# which is NOT the RFC 8032 Test 1 keypair.
+RFC8032_TEST1_SEED = bytes.fromhex(
+    "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
+)
+RFC8032_TEST1_PUBKEY = (
+    "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+)
+RFC8032_TEST1_SIG_EMPTY = (
+    "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e0652249015"
+    "55fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b"
+)
+
+
+class TestRFC8032KnownAnswer:
+    """Genuine RFC 8032 §7.1 Test 1 known-answer test.
+
+    Verifies the Ed25519 implementation the signer depends on against the RFC's
+    own published public key and signature over the empty message, then shows
+    the signer itself works with that exact keypair.
+    """
+
+    def test_pubkey_matches_rfc(self):
+        from nacl.signing import SigningKey
+
+        sk = SigningKey(RFC8032_TEST1_SEED)
+        assert sk.verify_key.encode().hex() == RFC8032_TEST1_PUBKEY
+
+    def test_signature_over_empty_message_matches_rfc(self):
+        from nacl.signing import SigningKey
+
+        sk = SigningKey(RFC8032_TEST1_SEED)
+        assert sk.sign(b"").signature.hex() == RFC8032_TEST1_SIG_EMPTY
+
+    def test_signer_works_with_rfc8032_keypair(self):
+        """sign_request with the RFC 8032 Test 1 seed produces an RFC 9421
+        signature that verifies under the RFC 8032 Test 1 public key."""
+        try:
+            from algovoi_rfc9421_verifier import verify_request
+        except ImportError:
+            pytest.skip("algovoi-rfc9421-verifier not installed")
+
+        body = b'{"agent_id":"rfc8032-test-1"}'
+        r = sign_request(
+            method="POST",
+            authority="api.algovoi.co.uk",
+            path="/compliance/screen",
+            body=body,
+            private_key=RFC8032_TEST1_SEED,
+            keyid=KEYID,
+            created=CREATED,
+        )
+        result = verify_request(
+            method="POST",
+            authority="api.algovoi.co.uk",
+            path="/compliance/screen",
+            headers={
+                "signature-input": r.signature_input,
+                "signature": r.signature,
+                "content-digest": r.content_digest,
+            },
+            body=body,
+            public_key=RFC8032_TEST1_PUBKEY,
+            mode="rfc9421",
+        )
+        assert result.valid, f"verification failed: {result.errors}"

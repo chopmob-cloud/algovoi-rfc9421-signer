@@ -1,9 +1,12 @@
 /**
  * Tests for @algovoi/rfc9421-signer.
  *
- * Uses the RFC 8032 §7.1 test vector 1 Ed25519 keypair:
- *   seed:       9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae3d55
- *   public key: d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a
+ * Uses a fixed deterministic Ed25519 test keypair for byte-reproducibility.
+ * This is NOT the RFC 8032 §7.1 Test 1 seed (that seed ends ...cae7f60); this
+ * seed ends ...cae3d55 and derives public key
+ *   700e2ce7c4b674427eab27ba820bcf6f0faebe68e09fe8564292114e41dc6a41
+ * The genuine RFC 8032 §7.1 Test 1 known-answer test is in the
+ * "RFC 8032 §7.1 Test 1 known-answer" describe block below.
  *
  * All deterministic tests use created=1748000000 for reproducibility.
  * Anchor-vector outputs must match algovoi_rfc9421_signer (Python) byte-for-byte.
@@ -11,6 +14,7 @@
 
 import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
+import * as ed from "@noble/ed25519";
 import { signRequest, SignError, DEFAULT_COVERED } from "../src/index.js";
 
 const SEED_HEX = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae3d55";
@@ -334,10 +338,64 @@ describe("anchor vector", () => {
       keyid: KEYID,
       created: CREATED,
     });
-    // The Python test_anchor_vector suite pins the signing-base.
-    // Since both use RFC 8032 §7.1 deterministic Ed25519, identical
-    // signing-base → identical signature. Verified by running both test
-    // suites and comparing r.signature values.
+    // The Python TestAnchorVector suite pins the signing-base. Deterministic
+    // Ed25519 over an identical signing base → identical signature; verified by
+    // running both test suites and comparing r.signature values.
     expect(r.signature).toMatch(/^sig=:[A-Za-z0-9+/=]{88}:$/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// RFC 8032 §7.1 Test 1 — genuine known-answer test
+// ---------------------------------------------------------------------------
+
+// Authoritative values published in RFC 8032 §7.1 (TEST 1). These anchor the
+// signer's Ed25519 dependency (@noble/ed25519) against the RFC itself — distinct
+// from the local deterministic parity fixture above (seed ...cae3d55), which is
+// NOT the RFC 8032 Test 1 keypair.
+const RFC8032_TEST1_SEED = Uint8Array.from(
+  Buffer.from(
+    "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+    "hex",
+  ),
+);
+const RFC8032_TEST1_PUBKEY =
+  "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
+const RFC8032_TEST1_SIG_EMPTY =
+  "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e0652249015" +
+  "55fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b";
+
+describe("RFC 8032 §7.1 Test 1 known-answer", () => {
+  it("derives the RFC's published public key", () => {
+    const pub = Buffer.from(ed.getPublicKey(RFC8032_TEST1_SEED)).toString("hex");
+    expect(pub).toBe(RFC8032_TEST1_PUBKEY);
+  });
+
+  it("signs the empty message to the RFC's published signature", () => {
+    const sig = Buffer.from(
+      ed.sign(new Uint8Array(0), RFC8032_TEST1_SEED),
+    ).toString("hex");
+    expect(sig).toBe(RFC8032_TEST1_SIG_EMPTY);
+  });
+
+  it("signer produces a valid signature with the RFC 8032 keypair", async () => {
+    const r = await signRequest({
+      method: "POST",
+      authority: "api.algovoi.co.uk",
+      path: "/compliance/screen",
+      body: Buffer.from('{"agent_id":"rfc8032-test-1"}'),
+      privateKey: RFC8032_TEST1_SEED,
+      keyid: KEYID,
+      created: CREATED,
+    });
+    // Signature verifies under the RFC 8032 Test 1 public key.
+    const sigB64 = r.signature.slice("sig=:".length, -1);
+    const sigBytes = Uint8Array.from(Buffer.from(sigB64, "base64"));
+    const ok = ed.verify(
+      sigBytes,
+      new TextEncoder().encode(r.signingBase),
+      RFC8032_TEST1_PUBKEY,
+    );
+    expect(ok).toBe(true);
   });
 });
