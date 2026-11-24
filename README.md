@@ -1,7 +1,7 @@
 # algovoi-rfc9421-signer
 
 
-[![PyPI](https://img.shields.io/pypi/v/algovoi-rfc9421-signer)](https://pypi.org/project/algovoi-rfc9421-signer/)
+[![PyPI](https://img.shields.io/pypi/v/algovoi-rfc9421-signer)](https://pypi.org/project/algovoi-rfc9421-signer/) [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
 [![npm](https://img.shields.io/npm/v/@algovoi/rfc9421-signer)](https://www.npmjs.com/package/@algovoi/rfc9421-signer)
 
 RFC 9421 (HTTP Message Signatures) + RFC 9530 (Content-Digest) **signer** — Python and TypeScript, byte-for-byte identical output from the same Ed25519 seed.
